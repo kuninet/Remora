@@ -20,5 +20,7 @@
     <string>13.0</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026 kuninet. All rights reserved.</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
 </dict>
 </plist>
