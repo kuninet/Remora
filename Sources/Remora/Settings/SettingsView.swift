@@ -17,11 +17,29 @@ struct SettingsView: View {
 
 // MARK: - Shares Tab
 
+enum ShareSheetMode: Identifiable {
+    case add
+    case edit(ShareConfig)
+
+    var id: String {
+        switch self {
+        case .add: return "add"
+        case .edit(let share): return "edit-\(share.id.uuidString)"
+        }
+    }
+
+    var existingShare: ShareConfig? {
+        switch self {
+        case .add: return nil
+        case .edit(let share): return share
+        }
+    }
+}
+
 struct SharesTabView: View {
     @ObservedObject var configStore: ConfigStore
     @State private var selectedID: UUID?
-    @State private var showingAddSheet = false
-    @State private var editingShare: ShareConfig?
+    @State private var sheetMode: ShareSheetMode?
     @State private var errorMessage: String?
 
     private var selectedShare: ShareConfig? {
@@ -35,9 +53,9 @@ struct SharesTabView: View {
             Divider()
             toolbar
         }
-        .sheet(isPresented: $showingAddSheet) {
+        .sheet(item: $sheetMode) { mode in
             ShareEditSheet(
-                existingShare: editingShare,
+                existingShare: mode.existingShare,
                 onSave: { share, password in
                     let key = KeychainKey(host: share.host, shareName: share.shareName)
                     do {
@@ -46,7 +64,7 @@ struct SharesTabView: View {
                         errorMessage = "パスワードの保存に失敗しました: \(error.localizedDescription)"
                     }
                     do {
-                        if editingShare != nil {
+                        if mode.existingShare != nil {
                             try configStore.updateShare(share)
                         } else {
                             try configStore.addShare(share)
@@ -54,12 +72,10 @@ struct SharesTabView: View {
                     } catch {
                         errorMessage = "設定の保存に失敗しました: \(error.localizedDescription)"
                     }
-                    editingShare = nil
-                    showingAddSheet = false
+                    sheetMode = nil
                 },
                 onCancel: {
-                    editingShare = nil
-                    showingAddSheet = false
+                    sheetMode = nil
                 }
             )
         }
@@ -83,17 +99,15 @@ struct SharesTabView: View {
         .listStyle(.inset)
         .frame(minHeight: 220)
         .onTapGesture(count: 2) {
-            guard editingShare == nil, let share = selectedShare else { return }
-            editingShare = share
-            showingAddSheet = true
+            guard sheetMode == nil, let share = selectedShare else { return }
+            sheetMode = .edit(share)
         }
     }
 
     private var toolbar: some View {
         HStack(spacing: 0) {
             Button {
-                editingShare = nil
-                showingAddSheet = true
+                sheetMode = .add
             } label: {
                 Image(systemName: "plus")
                     .frame(width: 24, height: 24)
@@ -122,8 +136,7 @@ struct SharesTabView: View {
 
             Button {
                 if let share = selectedShare {
-                    editingShare = share
-                    showingAddSheet = true
+                    sheetMode = .edit(share)
                 }
             } label: {
                 Image(systemName: "pencil")
@@ -173,6 +186,50 @@ private struct ShareRow: View {
     }
 }
 
+// MARK: - Share Form State (testable)
+
+/// Pure data carrier for the share edit form.
+/// Extracted from `ShareEditSheet` so the population logic is reachable from unit tests
+/// without spinning up SwiftUI.
+struct ShareFormState: Equatable {
+    var host: String = ""
+    var shareName: String = ""
+    var username: String = ""
+    var mountPoint: String = ""
+    var enabled: Bool = true
+
+    init() {}
+
+    init(from share: ShareConfig) {
+        host = share.host
+        shareName = share.shareName
+        username = share.username
+        mountPoint = share.mountPoint
+        enabled = share.enabled
+    }
+
+    var isValid: Bool {
+        !host.isEmpty && !shareName.isEmpty && !username.isEmpty
+    }
+
+    func toShare(existingID: UUID? = nil) -> ShareConfig {
+        ShareConfig(
+            id: existingID ?? UUID(),
+            host: host,
+            shareName: shareName,
+            username: username,
+            mountPoint: mountPoint.isEmpty ? "/Volumes/\(shareName)" : mountPoint,
+            enabled: enabled
+        )
+    }
+
+    mutating func autoFillMountPoint(forNewShareName newName: String) {
+        if mountPoint.isEmpty || mountPoint == "/Volumes/\(shareName)" {
+            mountPoint = "/Volumes/\(newName)"
+        }
+    }
+}
+
 // MARK: - Share Edit Sheet
 
 struct ShareEditSheet: View {
@@ -180,12 +237,8 @@ struct ShareEditSheet: View {
     var onSave: (ShareConfig, String) -> Void
     var onCancel: () -> Void
 
-    @State private var host: String
-    @State private var shareName: String
-    @State private var username: String
+    @State private var form: ShareFormState
     @State private var password: String
-    @State private var mountPoint: String
-    @State private var enabled: Bool
 
     init(
         existingShare: ShareConfig?,
@@ -195,12 +248,8 @@ struct ShareEditSheet: View {
         self.existingShare = existingShare
         self.onSave = onSave
         self.onCancel = onCancel
-        _host = State(initialValue: existingShare?.host ?? "")
-        _shareName = State(initialValue: existingShare?.shareName ?? "")
-        _username = State(initialValue: existingShare?.username ?? "")
+        _form = State(initialValue: existingShare.map(ShareFormState.init(from:)) ?? ShareFormState())
         _password = State(initialValue: "")
-        _mountPoint = State(initialValue: existingShare?.mountPoint ?? "")
-        _enabled = State(initialValue: existingShare?.enabled ?? true)
     }
 
     var body: some View {
@@ -220,23 +269,21 @@ struct ShareEditSheet: View {
             Form {
                 Section("接続先") {
                     LabeledContent("ホスト") {
-                        TextField("例: 192.168.1.10", text: $host)
+                        TextField("", text: $form.host, prompt: Text("例: 192.168.1.10"))
                             .textFieldStyle(.plain)
                     }
                     LabeledContent("共有名") {
-                        TextField("例: shared", text: $shareName)
+                        TextField("", text: $form.shareName, prompt: Text("例: shared"))
                             .textFieldStyle(.plain)
-                            .onChange(of: shareName) { newValue in
-                                if mountPoint.isEmpty || mountPoint == "/Volumes/\(shareName)" {
-                                    mountPoint = "/Volumes/\(newValue)"
-                                }
+                            .onChange(of: form.shareName) { newValue in
+                                form.autoFillMountPoint(forNewShareName: newValue)
                             }
                     }
                 }
 
                 Section("認証") {
                     LabeledContent("ユーザー名") {
-                        TextField("", text: $username)
+                        TextField("", text: $form.username)
                             .textFieldStyle(.plain)
                     }
                     LabeledContent("パスワード") {
@@ -247,10 +294,10 @@ struct ShareEditSheet: View {
 
                 Section("オプション") {
                     LabeledContent("マウント先") {
-                        TextField("/Volumes/…", text: $mountPoint)
+                        TextField("", text: $form.mountPoint, prompt: Text("/Volumes/…"))
                             .textFieldStyle(.plain)
                     }
-                    Toggle("有効", isOn: $enabled)
+                    Toggle("有効", isOn: $form.enabled)
                 }
             }
             .formStyle(.grouped)
@@ -262,19 +309,11 @@ struct ShareEditSheet: View {
                 Button("キャンセル") { onCancel() }
                     .keyboardShortcut(.cancelAction)
                 Button("保存") {
-                    let share = ShareConfig(
-                        id: existingShare?.id ?? UUID(),
-                        host: host,
-                        shareName: shareName,
-                        username: username,
-                        mountPoint: mountPoint.isEmpty ? "/Volumes/\(shareName)" : mountPoint,
-                        enabled: enabled
-                    )
-                    onSave(share, password)
+                    onSave(form.toShare(existingID: existingShare?.id), password)
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
-                .disabled(host.isEmpty || shareName.isEmpty || username.isEmpty)
+                .disabled(!form.isValid)
             }
             .padding()
         }
