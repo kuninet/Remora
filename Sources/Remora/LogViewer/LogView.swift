@@ -73,10 +73,14 @@ struct LogView: View {
         }
     }
 
+    private static let entryFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss.SSS"
+        return f
+    }()
+
     private func formatEntry(_ entry: LogEntry) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SSS"
-        return "[\(formatter.string(from: entry.date))] [\(entry.level.rawValue.uppercased())] [\(entry.category)] \(entry.message)"
+        "[\(Self.entryFormatter.string(from: entry.date))] [\(entry.level.rawValue.uppercased())] [\(entry.category)] \(entry.message)"
     }
 }
 
@@ -115,9 +119,13 @@ struct LogEntryRow: View {
         }
     }
 
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss.SSS"
+        return f
+    }()
+
     private var formattedTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SSS"
-        return formatter.string(from: entry.date)
+        Self.timeFormatter.string(from: entry.date)
     }
 }

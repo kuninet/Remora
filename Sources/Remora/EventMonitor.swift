@@ -12,13 +12,16 @@ final class EventMonitor {
     private let monitorQueue = DispatchQueue(label: "com.kuninet.Remora.network")
 
     func start() {
+        guard wakeObserver == nil else { return }
+
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                RLog(.info, category: "event", "スリープ復帰を検知")
+                RLog(.info, category: "event", "スリープ復帰を検知 (5秒後にマウントを試みます)")
+                try? await Task.sleep(for: .seconds(5))
                 self?.onWake?()
             }
         }
