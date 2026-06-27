@@ -91,6 +91,21 @@ swift test
 
 Xcode を入れたくない場合は、CI に頼る運用で問題ありません。詳細は [test.md](test.md) を参照。
 
+## アイコンを更新する場合
+
+アプリアイコン (`Resources/AppIcon.icns`) を再生成したい場合:
+
+```bash
+./scripts/make-icon.sh
+```
+
+実行内容:
+
+1. `swift scripts/make-icon.swift` で 1024×1024 のコバンザメアイコンを描画し、各サイズの PNG を `build/AppIcon.iconset/` に出力
+2. `iconutil` で `.icns` ファイルに変換し `Resources/AppIcon.icns` に保存
+
+アイコンのデザインを変更したい場合は `scripts/make-icon.swift` を編集してから上記コマンドを実行し、生成された `Resources/AppIcon.icns` をコミットしてください。
+
 ## CI でのビルド
 
 `.github/workflows/build.yml` が PR ごとに `swift build -c release` と `swift test` を実行し、緑/赤で結果を返します。CI ランナー (`macos-latest`) には Xcode が同梱されているため、`swift test` も含めて完全に検証されます。
