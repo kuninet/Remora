@@ -74,7 +74,7 @@ final class StatusItemController {
             badge = badgeImage(systemName: "exclamationmark.circle.fill", color: .systemYellow)
         }
 
-        button.image = badge == nil ? base : compositeIcon(base: base, badge: badge!)
+        button.image = badge == nil ? base : compositeWithBadge(badge!)
         button.contentTintColor = nil
         button.imagePosition = .imageOnly
     }
@@ -97,16 +97,19 @@ final class StatusItemController {
             return image
         }
         ctx.setShouldAntialias(true)
+        drawFishSilhouette(ctx: ctx, f: size / 22.0,
+                           fishColor: CGColor(gray: 0.0, alpha: 1.0),
+                           stripeColor: CGColor(gray: 1.0, alpha: 1.0))
+        image.unlockFocus()
+        return image
+    }
 
-        let f = size / 22.0
-        let black = CGColor(gray: 0.0, alpha: 1.0)
-        let white = CGColor(gray: 1.0, alpha: 1.0)
-
+    private func drawFishSilhouette(ctx: CGContext, f: CGFloat, fishColor: CGColor, stripeColor: CGColor) {
         let headX = 4.5 * f, tailX = 19.5 * f
         let bodyY = 9.0 * f, bodyHH = 3.8 * f
         let bulgeX = headX + (tailX - headX) * 0.38
 
-        ctx.setFillColor(black)
+        ctx.setFillColor(fishColor)
         ctx.beginPath()
         ctx.move(to: CGPoint(x: headX, y: bodyY))
         ctx.addCurve(
@@ -123,7 +126,6 @@ final class StatusItemController {
         ctx.closePath()
         ctx.fillPath()
 
-        // Tail fins
         ctx.beginPath()
         ctx.move(to: CGPoint(x: tailX, y: bodyY + 2.5 * f))
         ctx.addLine(to: CGPoint(x: tailX + 3.5 * f, y: bodyY + 7 * f))
@@ -137,10 +139,9 @@ final class StatusItemController {
         ctx.closePath()
         ctx.fillPath()
 
-        // Suction disc
         let discCX = 6.2 * f, discCY = 14.5 * f
         let discRX = 2.5 * f, discRY = 5.5 * f
-        ctx.setFillColor(black)
+        ctx.setFillColor(fishColor)
         ctx.beginPath()
         ctx.addEllipse(in: CGRect(
             x: discCX - discRX, y: discCY - discRY,
@@ -148,7 +149,7 @@ final class StatusItemController {
         ))
         ctx.fillPath()
 
-        ctx.setStrokeColor(white)
+        ctx.setStrokeColor(stripeColor)
         ctx.setLineWidth(max(0.5, 0.9 * f))
         ctx.setLineCap(.round)
         for i in 0..<4 {
@@ -164,9 +165,25 @@ final class StatusItemController {
                 ctx.strokePath()
             }
         }
+    }
 
-        image.unlockFocus()
-        return image
+    private func compositeWithBadge(_ badge: NSImage) -> NSImage {
+        let size = NSSize(width: 22, height: 22)
+        return NSImage(size: size, flipped: false) { [weak self] _ in
+            guard let self,
+                  let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            ctx.setShouldAntialias(true)
+            let isDark = NSAppearance.currentDrawing()
+                .bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let fishColor = isDark ? CGColor(gray: 1.0, alpha: 1.0) : CGColor(gray: 0.0, alpha: 1.0)
+            let stripeColor = isDark ? CGColor(gray: 0.0, alpha: 1.0) : CGColor(gray: 1.0, alpha: 1.0)
+            self.drawFishSilhouette(ctx: ctx, f: 1.0, fishColor: fishColor, stripeColor: stripeColor)
+            let bSize = badge.size
+            badge.draw(in: NSRect(x: size.width - bSize.width, y: 0,
+                                  width: bSize.width, height: bSize.height),
+                       from: .zero, operation: .sourceOver, fraction: 1.0)
+            return true
+        }
     }
 
     private func badgeImage(systemName: String, color: NSColor) -> NSImage {
@@ -184,21 +201,6 @@ final class StatusItemController {
         return tinted
     }
 
-    private func compositeIcon(base: NSImage, badge: NSImage) -> NSImage {
-        let size = NSSize(width: 22, height: 22)
-        let composite = NSImage(size: size)
-        composite.lockFocus()
-        base.draw(in: NSRect(x: 0, y: 2, width: 20, height: 18),
-                  from: .zero, operation: .sourceOver, fraction: 1.0)
-        let bSize = badge.size
-        badge.draw(in: NSRect(x: size.width - bSize.width,
-                              y: 0,
-                              width: bSize.width,
-                              height: bSize.height),
-                   from: .zero, operation: .sourceOver, fraction: 1.0)
-        composite.unlockFocus()
-        return composite
-    }
 
     // MARK: - Menu
 
