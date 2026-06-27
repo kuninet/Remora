@@ -204,11 +204,11 @@ struct ShareEditSheet: View {
             Form {
                 Section("接続先") {
                     LabeledContent("ホスト") {
-                        TextField("例: 192.168.1.10", text: $host)
+                        TextField("", text: $host)
                             .textFieldStyle(.plain)
                     }
                     LabeledContent("共有名") {
-                        TextField("例: shared", text: $shareName)
+                        TextField("", text: $shareName)
                             .textFieldStyle(.plain)
                             .onChange(of: shareName) { newValue in
                                 if mountPoint.isEmpty || mountPoint == "/Volumes/\(shareName)" {
@@ -231,7 +231,7 @@ struct ShareEditSheet: View {
 
                 Section("オプション") {
                     LabeledContent("マウント先") {
-                        TextField("/Volumes/…", text: $mountPoint)
+                        TextField("", text: $mountPoint)
                             .textFieldStyle(.plain)
                     }
                     Toggle("有効", isOn: $enabled)
