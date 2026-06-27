@@ -44,6 +44,7 @@ actor MountManager {
 
         let password = try KeychainStore.password(for: KeychainKey(host: share.host, shareName: share.shareName))
 
+        let capturedShare = share
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let openOptions: NSMutableDictionary = [
                 kNetFSAllowLoopbackKey as String: false,
@@ -58,20 +59,22 @@ actor MountManager {
 
             let mountPointURL = URL(fileURLWithPath: mountPoint) as CFURL
 
-            let result = NetFSMountURLSync(
-                url as CFURL,
-                mountPointURL,
-                share.username as CFString,
-                password as CFString?,
-                openOptions,
-                mountOptions,
-                nil
-            )
+            Task.detached(priority: .background) {
+                let result = NetFSMountURLSync(
+                    url as CFURL,
+                    mountPointURL,
+                    capturedShare.username as CFString,
+                    nil,
+                    openOptions,
+                    mountOptions,
+                    nil
+                )
 
-            if result == 0 {
-                continuation.resume()
-            } else {
-                continuation.resume(throwing: mapNetFSError(result))
+                if result == 0 {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: Self.mapNetFSError(result, share: capturedShare))
+                }
             }
         }
     }
@@ -164,14 +167,14 @@ actor MountManager {
         }
     }
 
-    private func mapNetFSError(_ status: Int32) -> RemoraError {
+    private nonisolated static func mapNetFSError(_ status: Int32, share: ShareConfig) -> RemoraError {
         switch status {
         case -6003:
-            return .authFailed(share: "")
+            return .authFailed(share: share.shareName)
         case -6002:
-            return .hostUnreachable(host: "")
+            return .hostUnreachable(host: share.host)
         case -6004:
-            return .shareNotFound(share: "")
+            return .shareNotFound(share: share.shareName)
         default:
             return .mountFailed(OSStatus(status))
         }

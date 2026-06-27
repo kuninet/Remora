@@ -10,13 +10,14 @@ struct KeychainKey: Sendable, Hashable {
 
 enum KeychainStore {
     static func setPassword(_ password: String, for key: KeychainKey) throws {
-        guard let data = password.data(using: .utf8) else { return }
+        guard let data = password.data(using: .utf8) else {
+            throw RemoraError.keychainWriteFailed(errSecParam)
+        }
 
         let query: [CFString: Any] = [
-            kSecClass: kSecClassInternetPassword,
+            kSecClass: kSecClassGenericPassword,
             kSecAttrService: KeychainKey.service,
             kSecAttrAccount: key.account,
-            kSecAttrServer: key.host,
         ]
 
         let attributes: [CFString: Any] = [
@@ -37,10 +38,9 @@ enum KeychainStore {
 
     static func password(for key: KeychainKey) throws -> String? {
         let query: [CFString: Any] = [
-            kSecClass: kSecClassInternetPassword,
+            kSecClass: kSecClassGenericPassword,
             kSecAttrService: KeychainKey.service,
             kSecAttrAccount: key.account,
-            kSecAttrServer: key.host,
             kSecReturnData: kCFBooleanTrue as Any,
             kSecMatchLimit: kSecMatchLimitOne,
         ]
@@ -63,10 +63,9 @@ enum KeychainStore {
 
     static func deletePassword(for key: KeychainKey) throws {
         let query: [CFString: Any] = [
-            kSecClass: kSecClassInternetPassword,
+            kSecClass: kSecClassGenericPassword,
             kSecAttrService: KeychainKey.service,
             kSecAttrAccount: key.account,
-            kSecAttrServer: key.host,
         ]
 
         let status = SecItemDelete(query as CFDictionary)

@@ -15,7 +15,7 @@ struct ShareMountState: Sendable {
 
     func shouldNotify(threshold: Int) -> Bool {
         if case .failing(let count) = status {
-            return count >= threshold
+            return count == threshold
         }
         return false
     }
