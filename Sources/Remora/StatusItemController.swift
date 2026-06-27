@@ -159,6 +159,10 @@ final class StatusItemController {
 
         menu.addItem(.separator())
 
+        let aboutItem = NSMenuItem(title: "Remora について…", action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
         let quitItem = NSMenuItem(title: "Remoraを終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
 
@@ -216,6 +220,13 @@ final class StatusItemController {
             )
         }
         settingsWindowController?.show()
+    }
+
+    @objc private func showAbout() {
+        NSApplication.shared.orderFrontStandardAboutPanel(options: [
+            .applicationName: "Remora",
+            .credits: NSAttributedString(string: "MIT License\nhttps://github.com/kuninet/Remora"),
+        ])
     }
 
     @objc private func toggleLoginItem() {
