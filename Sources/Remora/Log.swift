@@ -23,8 +23,6 @@ actor LogStore {
 
     private var continuations: [UUID: AsyncStream<[LogEntry]>.Continuation] = [:]
 
-    private let osLog = Logger(subsystem: "com.kuninet.Remora", category: "general")
-
     private init() {}
 
     func append(level: LogLevel, category: String, message: String) {
