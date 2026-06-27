@@ -24,6 +24,10 @@ Remora は 1 分ごとに状態をチェックし、スリープ復帰やネッ�
 - ログイン時に自動起動 (SMAppService)
 - Python などのランタイム非同梱の単体 `.app`
 
+## ダウンロード
+
+ビルド済みの `.app` がほしい場合は [Releases](https://github.com/kuninet/Remora/releases) から最新の `Remora-vX.Y.zip` を取得してください。展開した `Remora.app` を `/Applications` にドラッグするだけで使えます (初回起動時の流れは下記「初回起動時の注意」参照)。
+
 ## 必要環境
 
 - macOS 13 (Ventura) 以降
@@ -48,6 +52,7 @@ Remora は 1 分ごとに状態をチェックし、スリープ復帰やネッ�
 | `/Applications` に置いて使いたい | [docs/install.md](docs/install.md) |
 | テストを実行したい | [docs/test.md](docs/test.md) |
 | 内部構造を知りたい | [docs/architecture.md](docs/architecture.md) |
+| リリースを切りたい (メンテナ向け) | [docs/release.md](docs/release.md) |
 
 ## ライセンス
 
