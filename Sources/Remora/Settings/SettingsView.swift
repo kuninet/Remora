@@ -180,12 +180,28 @@ struct ShareEditSheet: View {
     var onSave: (ShareConfig, String) -> Void
     var onCancel: () -> Void
 
-    @State private var host: String = ""
-    @State private var shareName: String = ""
-    @State private var username: String = ""
-    @State private var password: String = ""
-    @State private var mountPoint: String = ""
-    @State private var enabled: Bool = true
+    @State private var host: String
+    @State private var shareName: String
+    @State private var username: String
+    @State private var password: String
+    @State private var mountPoint: String
+    @State private var enabled: Bool
+
+    init(
+        existingShare: ShareConfig?,
+        onSave: @escaping (ShareConfig, String) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.existingShare = existingShare
+        self.onSave = onSave
+        self.onCancel = onCancel
+        _host = State(initialValue: existingShare?.host ?? "")
+        _shareName = State(initialValue: existingShare?.shareName ?? "")
+        _username = State(initialValue: existingShare?.username ?? "")
+        _password = State(initialValue: "")
+        _mountPoint = State(initialValue: existingShare?.mountPoint ?? "")
+        _enabled = State(initialValue: existingShare?.enabled ?? true)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -264,17 +280,11 @@ struct ShareEditSheet: View {
         }
         .frame(width: 460)
         .onAppear {
-            if let share = existingShare {
-                host = share.host
-                shareName = share.shareName
-                username = share.username
-                mountPoint = share.mountPoint
-                enabled = share.enabled
-                if let pw = try? KeychainStore.password(
-                    for: KeychainKey(host: share.host, shareName: share.shareName)
-                ) {
-                    password = pw
-                }
+            if let share = existingShare,
+               let pw = try? KeychainStore.password(
+                   for: KeychainKey(host: share.host, shareName: share.shareName)
+               ) {
+                password = pw
             }
         }
     }
