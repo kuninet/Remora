@@ -13,7 +13,12 @@ if CommandLine.arguments.count > 1 {
     outputDir = "\(cwd)/build/AppIcon.iconset"
 }
 
-try? FileManager.default.createDirectory(atPath: outputDir, withIntermediateDirectories: true)
+do {
+    try FileManager.default.createDirectory(atPath: outputDir, withIntermediateDirectories: true)
+} catch {
+    fputs("Error: ディレクトリの作成に失敗しました: \(error.localizedDescription)\n", stderr)
+    exit(1)
+}
 
 let iconsetSizes: [(String, Int)] = [
     ("icon_16x16.png", 16),
