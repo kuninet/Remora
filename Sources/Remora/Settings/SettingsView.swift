@@ -11,10 +11,11 @@ struct SettingsView: View {
             AdvancedTabView(configStore: configStore, loginItemManager: loginItemManager)
                 .tabItem { Label("詳細設定", systemImage: "gearshape") }
         }
-        .padding()
-        .frame(minWidth: 520, minHeight: 440)
+        .frame(minWidth: 540, minHeight: 460)
     }
 }
+
+// MARK: - Shares Tab
 
 struct SharesTabView: View {
     @ObservedObject var configStore: ConfigStore
@@ -23,49 +24,16 @@ struct SharesTabView: View {
     @State private var editingShare: ShareConfig?
     @State private var errorMessage: String?
 
-    var body: some View {
-        VStack(alignment: .leading) {
-            List(selection: $selectedID) {
-                ForEach(configStore.config.shares) { share in
-                    HStack {
-                        Image(systemName: share.enabled ? "externaldrive.connected.to.line.below" : "externaldrive")
-                            .foregroundColor(share.enabled ? .accentColor : .secondary)
-                        VStack(alignment: .leading) {
-                            Text("\(share.host)/\(share.shareName)")
-                                .font(.body)
-                            Text(share.mountPoint)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .tag(share.id)
-                }
-            }
-            .frame(minHeight: 200)
+    private var selectedShare: ShareConfig? {
+        guard let id = selectedID else { return nil }
+        return configStore.config.shares.first(where: { $0.id == id })
+    }
 
-            HStack {
-                Button("追加") { showingAddSheet = true }
-                Button("編集") {
-                    if let id = selectedID,
-                       let share = configStore.config.shares.first(where: { $0.id == id }) {
-                        editingShare = share
-                        showingAddSheet = true
-                    }
-                }
-                .disabled(selectedID == nil)
-                Button("削除") {
-                    if let id = selectedID {
-                        do {
-                            try configStore.removeShare(id: id)
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                        selectedID = nil
-                    }
-                }
-                .disabled(selectedID == nil)
-            }
-            .padding(.top, 4)
+    var body: some View {
+        VStack(spacing: 0) {
+            shareList
+            Divider()
+            toolbar
         }
         .sheet(isPresented: $showingAddSheet) {
             ShareEditSheet(
@@ -104,7 +72,109 @@ struct SharesTabView: View {
             Text(errorMessage ?? "")
         }
     }
+
+    private var shareList: some View {
+        List(selection: $selectedID) {
+            ForEach(configStore.config.shares) { share in
+                ShareRow(share: share)
+                    .tag(share.id)
+            }
+        }
+        .listStyle(.inset)
+        .frame(minHeight: 220)
+        .onTapGesture(count: 2) {
+            if selectedShare != nil {
+                editingShare = selectedShare
+                showingAddSheet = true
+            }
+        }
+    }
+
+    private var toolbar: some View {
+        HStack(spacing: 0) {
+            Button {
+                editingShare = nil
+                showingAddSheet = true
+            } label: {
+                Image(systemName: "plus")
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.borderless)
+
+            Divider().frame(height: 16)
+
+            Button {
+                if let id = selectedID {
+                    do {
+                        try configStore.removeShare(id: id)
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                    selectedID = nil
+                }
+            } label: {
+                Image(systemName: "minus")
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.borderless)
+            .disabled(selectedID == nil)
+
+            Divider().frame(height: 16)
+
+            Button {
+                if let share = selectedShare {
+                    editingShare = share
+                    showingAddSheet = true
+                }
+            } label: {
+                Image(systemName: "pencil")
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.borderless)
+            .disabled(selectedShare == nil)
+
+            Spacer()
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+    }
 }
+
+private struct ShareRow: View {
+    let share: ShareConfig
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: share.enabled
+                ? "externaldrive.connected.to.line.below"
+                : "externaldrive")
+                .foregroundStyle(share.enabled ? Color.accentColor : .secondary)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(share.host)  /  \(share.shareName)")
+                    .font(.body)
+                Text(share.mountPoint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if !share.enabled {
+                Text("無効")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.quaternary, in: Capsule())
+            }
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+// MARK: - Share Edit Sheet
 
 struct ShareEditSheet: View {
     var existingShare: ShareConfig?
@@ -119,27 +189,63 @@ struct ShareEditSheet: View {
     @State private var enabled: Bool = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(existingShare == nil ? "共有の追加" : "共有の編集")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "externaldrive.badge.plus")
+                    .font(.title2)
+                    .foregroundStyle(.tint)
+                Text(existingShare == nil ? "共有の追加" : "共有の編集")
+                    .font(.headline)
+            }
+            .padding([.horizontal, .top])
+            .padding(.bottom, 12)
+
+            Divider()
 
             Form {
-                TextField("ホスト (例: 192.168.1.10)", text: $host)
-                TextField("共有名 (例: shared)", text: $shareName)
-                    .onChange(of: shareName) { newValue in
-                        if mountPoint.isEmpty || mountPoint == "/Volumes/\(shareName)" {
-                            mountPoint = "/Volumes/\(newValue)"
-                        }
+                Section("接続先") {
+                    LabeledContent("ホスト") {
+                        TextField("例: 192.168.1.10", text: $host)
+                            .textFieldStyle(.plain)
                     }
-                TextField("ユーザー名", text: $username)
-                SecureField("パスワード", text: $password)
-                TextField("マウント先", text: $mountPoint)
-                Toggle("有効", isOn: $enabled)
+                    LabeledContent("共有名") {
+                        TextField("例: shared", text: $shareName)
+                            .textFieldStyle(.plain)
+                            .onChange(of: shareName) { newValue in
+                                if mountPoint.isEmpty || mountPoint == "/Volumes/\(shareName)" {
+                                    mountPoint = "/Volumes/\(newValue)"
+                                }
+                            }
+                    }
+                }
+
+                Section("認証") {
+                    LabeledContent("ユーザー名") {
+                        TextField("", text: $username)
+                            .textFieldStyle(.plain)
+                    }
+                    LabeledContent("パスワード") {
+                        SecureField("", text: $password)
+                            .textFieldStyle(.plain)
+                    }
+                }
+
+                Section("オプション") {
+                    LabeledContent("マウント先") {
+                        TextField("/Volumes/…", text: $mountPoint)
+                            .textFieldStyle(.plain)
+                    }
+                    Toggle("有効", isOn: $enabled)
+                }
             }
+            .formStyle(.grouped)
+
+            Divider()
 
             HStack {
                 Spacer()
                 Button("キャンセル") { onCancel() }
+                    .keyboardShortcut(.cancelAction)
                 Button("保存") {
                     let share = ShareConfig(
                         id: existingShare?.id ?? UUID(),
@@ -152,11 +258,12 @@ struct ShareEditSheet: View {
                     onSave(share, password)
                 }
                 .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
                 .disabled(host.isEmpty || shareName.isEmpty || username.isEmpty)
             }
+            .padding()
         }
-        .padding()
-        .frame(width: 480)
+        .frame(width: 460)
         .onAppear {
             if let share = existingShare {
                 host = share.host
@@ -164,13 +271,17 @@ struct ShareEditSheet: View {
                 username = share.username
                 mountPoint = share.mountPoint
                 enabled = share.enabled
-                if let pw = try? KeychainStore.password(for: KeychainKey(host: share.host, shareName: share.shareName)) {
+                if let pw = try? KeychainStore.password(
+                    for: KeychainKey(host: share.host, shareName: share.shareName)
+                ) {
                     password = pw
                 }
             }
         }
     }
 }
+
+// MARK: - Advanced Tab
 
 struct AdvancedTabView: View {
     @ObservedObject var configStore: ConfigStore
@@ -182,85 +293,102 @@ struct AdvancedTabView: View {
 
     var body: some View {
         Form {
-            Section("チェック間隔") {
-                Stepper(
-                    "\(configStore.config.checkIntervalSeconds) 秒",
-                    value: Binding(
-                        get: { configStore.config.checkIntervalSeconds },
-                        set: { newVal in
-                            var c = configStore.config
-                            c.checkIntervalSeconds = max(30, min(600, newVal))
-                            do {
-                                try configStore.update(c)
-                            } catch {
-                                errorMessage = error.localizedDescription
+            Section {
+                LabeledContent("チェック間隔") {
+                    Stepper(
+                        "\(configStore.config.checkIntervalSeconds) 秒",
+                        value: Binding(
+                            get: { configStore.config.checkIntervalSeconds },
+                            set: { newVal in
+                                var c = configStore.config
+                                c.checkIntervalSeconds = max(30, min(600, newVal))
+                                saveConfig(c)
                             }
-                        }
-                    ),
-                    step: 30
-                )
+                        ),
+                        step: 30
+                    )
+                }
+                LabeledContent("失敗通知まで") {
+                    Stepper(
+                        "\(configStore.config.consecutiveFailuresBeforeNotify) 回連続",
+                        value: Binding(
+                            get: { configStore.config.consecutiveFailuresBeforeNotify },
+                            set: { newVal in
+                                var c = configStore.config
+                                c.consecutiveFailuresBeforeNotify = max(1, newVal)
+                                saveConfig(c)
+                            }
+                        ),
+                        step: 1
+                    )
+                }
+            } header: {
+                Label("マウント設定", systemImage: "arrow.clockwise")
             }
 
-            Section("連続失敗通知") {
-                Stepper(
-                    "\(configStore.config.consecutiveFailuresBeforeNotify) 回",
-                    value: Binding(
-                        get: { configStore.config.consecutiveFailuresBeforeNotify },
-                        set: { newVal in
-                            var c = configStore.config
-                            c.consecutiveFailuresBeforeNotify = max(1, newVal)
-                            do {
-                                try configStore.update(c)
-                            } catch {
-                                errorMessage = error.localizedDescription
-                            }
-                        }
-                    ),
-                    step: 1
-                )
-            }
-
-            Section("休止時間帯") {
+            Section {
                 ForEach(Array(configStore.config.quietHours.enumerated()), id: \.offset) { index, range in
                     HStack {
-                        Text("\(range.start) 〜 \(range.end)")
+                        Image(systemName: "moon.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 16)
+                        Text("\(range.start)  〜  \(range.end)")
                         Spacer()
-                        Button("削除") {
+                        Button {
                             do {
                                 try configStore.removeQuietHour(at: index)
                             } catch {
                                 errorMessage = error.localizedDescription
                             }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(.red)
                         }
-                        .foregroundColor(.red)
+                        .buttonStyle(.borderless)
                     }
                 }
 
-                HStack {
-                    TextField("開始 (HH:MM)", text: $newQuietStart)
-                        .frame(width: 80)
+                HStack(spacing: 6) {
+                    TextField("HH:MM", text: $newQuietStart)
+                        .frame(width: 72)
+                        .textFieldStyle(.roundedBorder)
                     Text("〜")
-                    TextField("終了 (HH:MM)", text: $newQuietEnd)
-                        .frame(width: 80)
-                    Button("追加") {
+                        .foregroundStyle(.secondary)
+                    TextField("HH:MM", text: $newQuietEnd)
+                        .frame(width: 72)
+                        .textFieldStyle(.roundedBorder)
+                    Spacer()
+                    Button {
                         let range = QuietHourRange(start: newQuietStart, end: newQuietEnd)
                         do {
                             try configStore.addQuietHour(range)
                         } catch {
                             errorMessage = error.localizedDescription
                         }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Color.accentColor)
                     }
+                    .buttonStyle(.borderless)
+                    .disabled(newQuietStart.isEmpty || newQuietEnd.isEmpty)
                 }
+            } header: {
+                Label("休止時間帯", systemImage: "moon.zzz")
+            } footer: {
+                Text("この時間帯はマウント試行を行いません。日またぎ範囲 (例: 23:00 〜 07:00) にも対応します。")
+                    .foregroundStyle(.secondary)
             }
 
-            Section("自動起動") {
+            Section {
                 Toggle("ログイン時に自動起動", isOn: Binding(
                     get: { loginItemManager.isEnabled },
                     set: { _ in try? loginItemManager.toggle() }
                 ))
+            } header: {
+                Label("スタートアップ", systemImage: "power")
             }
         }
-        .padding()
+        .formStyle(.grouped)
         .alert("エラー", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -268,6 +396,14 @@ struct AdvancedTabView: View {
             Button("OK") { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")
+        }
+    }
+
+    private func saveConfig(_ config: AppConfig) {
+        do {
+            try configStore.update(config)
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }
