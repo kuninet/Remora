@@ -21,6 +21,12 @@ if [ -f "$REPO_ROOT/Resources/AppIcon.icns" ]; then
     cp "$REPO_ROOT/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/"
 fi
 
+for img in MenuBarIcon.png MenuBarIcon@2x.png; do
+    if [ -f "$REPO_ROOT/Resources/$img" ]; then
+        cp "$REPO_ROOT/Resources/$img" "$APP_DIR/Contents/Resources/"
+    fi
+done
+
 chmod +x "$APP_DIR/Contents/MacOS/Remora"
 
 echo "Build complete: $APP_DIR"

@@ -53,34 +53,156 @@ final class StatusItemController {
         rebuildMenu(states: [])
     }
 
+    // MARK: - Icon
+
     private func updateIcon(states: [ShareMountState], isQuiet: Bool) {
         guard let button = statusItem?.button else { return }
 
-        let symbolName: String
-        let tintColor: NSColor?
+        let base = baseMenuBarIcon()
+        let badge: NSImage?
 
         if isQuiet {
-            symbolName = "externaldrive.badge.minus"
-            tintColor = .systemGray
+            badge = badgeImage(systemName: "moon.fill", color: .systemGray)
         } else if states.isEmpty || states.allSatisfy({ $0.status == .mounted }) {
-            symbolName = "externaldrive.connected.to.line.below"
-            tintColor = nil
-        } else if states.allSatisfy({ if case .failing = $0.status { return true }; return $0.status == .unmounted }) {
-            symbolName = "externaldrive.badge.xmark"
-            tintColor = .systemRed
+            badge = nil
+        } else if states.allSatisfy({
+            if case .failing = $0.status { return true }
+            return $0.status == .unmounted
+        }) {
+            badge = badgeImage(systemName: "xmark.circle.fill", color: .systemRed)
         } else {
-            symbolName = "externaldrive.badge.exclamationmark"
-            tintColor = .systemYellow
+            badge = badgeImage(systemName: "exclamationmark.circle.fill", color: .systemYellow)
         }
 
-        let config = NSImage.SymbolConfiguration(pointSize: 16, weight: .regular)
-        let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "Remora")?
-            .withSymbolConfiguration(config)
-
-        button.image = image
-        button.contentTintColor = tintColor
+        button.image = badge == nil ? base : compositeWithBadge(badge!)
+        button.contentTintColor = nil
         button.imagePosition = .imageOnly
     }
+
+    private func baseMenuBarIcon() -> NSImage {
+        if let img = NSImage(named: "MenuBarIcon") {
+            img.isTemplate = true
+            return img
+        }
+        return drawnMenuBarIcon()
+    }
+
+    private func drawnMenuBarIcon() -> NSImage {
+        let size: CGFloat = 22
+        let image = NSImage(size: NSSize(width: size, height: size))
+        image.isTemplate = true
+        image.lockFocus()
+        guard let ctx = NSGraphicsContext.current?.cgContext else {
+            image.unlockFocus()
+            return image
+        }
+        ctx.setShouldAntialias(true)
+        drawFishSilhouette(ctx: ctx, f: size / 22.0,
+                           fishColor: CGColor(gray: 0.0, alpha: 1.0),
+                           stripeColor: CGColor(gray: 1.0, alpha: 1.0))
+        image.unlockFocus()
+        return image
+    }
+
+    private func drawFishSilhouette(ctx: CGContext, f: CGFloat, fishColor: CGColor, stripeColor: CGColor) {
+        let headX = 4.5 * f, tailX = 19.5 * f
+        let bodyY = 9.0 * f, bodyHH = 3.8 * f
+        let bulgeX = headX + (tailX - headX) * 0.38
+
+        ctx.setFillColor(fishColor)
+        ctx.beginPath()
+        ctx.move(to: CGPoint(x: headX, y: bodyY))
+        ctx.addCurve(
+            to: CGPoint(x: tailX, y: bodyY + 2.5 * f),
+            control1: CGPoint(x: bulgeX, y: bodyY + bodyHH),
+            control2: CGPoint(x: tailX - 5 * f, y: bodyY + 3.8 * f)
+        )
+        ctx.addLine(to: CGPoint(x: tailX, y: bodyY - 2.5 * f))
+        ctx.addCurve(
+            to: CGPoint(x: headX, y: bodyY),
+            control1: CGPoint(x: tailX - 5 * f, y: bodyY - 3.8 * f),
+            control2: CGPoint(x: bulgeX, y: bodyY - bodyHH)
+        )
+        ctx.closePath()
+        ctx.fillPath()
+
+        ctx.beginPath()
+        ctx.move(to: CGPoint(x: tailX, y: bodyY + 2.5 * f))
+        ctx.addLine(to: CGPoint(x: tailX + 3.5 * f, y: bodyY + 7 * f))
+        ctx.addLine(to: CGPoint(x: tailX + 1.5 * f, y: bodyY + 1.5 * f))
+        ctx.closePath()
+        ctx.fillPath()
+        ctx.beginPath()
+        ctx.move(to: CGPoint(x: tailX, y: bodyY - 2.5 * f))
+        ctx.addLine(to: CGPoint(x: tailX + 3.5 * f, y: bodyY - 7 * f))
+        ctx.addLine(to: CGPoint(x: tailX + 1.5 * f, y: bodyY - 1.5 * f))
+        ctx.closePath()
+        ctx.fillPath()
+
+        let discCX = 6.2 * f, discCY = 14.5 * f
+        let discRX = 2.5 * f, discRY = 5.5 * f
+        ctx.setFillColor(fishColor)
+        ctx.beginPath()
+        ctx.addEllipse(in: CGRect(
+            x: discCX - discRX, y: discCY - discRY,
+            width: discRX * 2, height: discRY * 2
+        ))
+        ctx.fillPath()
+
+        ctx.setStrokeColor(stripeColor)
+        ctx.setLineWidth(max(0.5, 0.9 * f))
+        ctx.setLineCap(.round)
+        for i in 0..<4 {
+            let t = CGFloat(i) / 3.0
+            let y = discCY - (discRY - 1.2 * f) + t * (discRY - 1.2 * f) * 2
+            let dy = (y - discCY) / discRY
+            guard abs(dy) <= 1.0 else { continue }
+            let hw = discRX * sqrt(1.0 - dy * dy) - 0.8 * f
+            if hw > 0.5 * f {
+                ctx.beginPath()
+                ctx.move(to: CGPoint(x: discCX - hw, y: y))
+                ctx.addLine(to: CGPoint(x: discCX + hw, y: y))
+                ctx.strokePath()
+            }
+        }
+    }
+
+    private func compositeWithBadge(_ badge: NSImage) -> NSImage {
+        let size = NSSize(width: 22, height: 22)
+        return NSImage(size: size, flipped: false) { [weak self] _ in
+            guard let self,
+                  let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            ctx.setShouldAntialias(true)
+            let isDark = NSAppearance.currentDrawing()
+                .bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let fishColor = isDark ? CGColor(gray: 1.0, alpha: 1.0) : CGColor(gray: 0.0, alpha: 1.0)
+            let stripeColor = isDark ? CGColor(gray: 0.0, alpha: 1.0) : CGColor(gray: 1.0, alpha: 1.0)
+            self.drawFishSilhouette(ctx: ctx, f: 1.0, fishColor: fishColor, stripeColor: stripeColor)
+            let bSize = badge.size
+            badge.draw(in: NSRect(x: size.width - bSize.width, y: 0,
+                                  width: bSize.width, height: bSize.height),
+                       from: .zero, operation: .sourceOver, fraction: 1.0)
+            return true
+        }
+    }
+
+    private func badgeImage(systemName: String, color: NSColor) -> NSImage {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 8, weight: .bold)
+        guard let sym = NSImage(systemSymbolName: systemName, accessibilityDescription: nil)?
+            .withSymbolConfiguration(cfg) else {
+            return NSImage()
+        }
+        let tinted = NSImage(size: sym.size)
+        tinted.lockFocus()
+        color.set()
+        sym.draw(at: .zero, from: NSRect(origin: .zero, size: sym.size),
+                 operation: .sourceOver, fraction: 1.0)
+        tinted.unlockFocus()
+        return tinted
+    }
+
+
+    // MARK: - Menu
 
     private func rebuildMenu(states: [ShareMountState]) {
         let menu = NSMenu()
@@ -168,6 +290,8 @@ final class StatusItemController {
 
         statusItem?.menu = menu
     }
+
+    // MARK: - Actions
 
     @objc private func openInFinder(_ sender: NSMenuItem) {
         guard let mountPoint = sender.representedObject as? String else { return }
