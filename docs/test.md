@@ -1,12 +1,16 @@
 # テスト手順
 
+> ⚠ **`swift test` のローカル実行には Xcode 本体が必要です**。Command Line Tools (CLT) 単体には `XCTest.framework` が含まれないため、CLT のみの環境ではテストが起動しません。Xcode を入れたくない場合は、CI (GitHub Actions) の緑/赤を信用する運用にしてください。詳細は [build.md の「テストを実行する場合」](build.md#テストを実行する場合) を参照。
+
 ## ユニットテスト
 
 ```bash
+# Xcode を有効化済みであることが前提
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer  # 一度だけ
 swift test
 ```
 
-CI でも同じコマンドが走り、PR ごとに緑/赤で判定されます。
+CI でも同じコマンドが走り、PR ごとに緑/赤で判定されます。CI ランナー (`macos-latest`) には Xcode が同梱されているので、ローカルで動かなくても CI が緑なら品質保証はされています。
 
 ### テスト対象の範囲
 
