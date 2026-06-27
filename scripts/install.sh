@@ -10,6 +10,7 @@ if [ ! -d "$APP_SRC" ]; then
     exit 1
 fi
 
+# Remora が起動中の場合は事前に終了させてください (killall Remora)
 echo "Installing Remora.app to /Applications..."
 cp -r "$APP_SRC" "$APP_DST"
 echo "Installed: $APP_DST"
