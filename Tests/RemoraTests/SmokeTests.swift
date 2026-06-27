@@ -1,93 +1,80 @@
-import Testing
+import XCTest
 import Foundation
 @testable import Remora
 
-@Suite("QuietHours Tests")
-struct QuietHoursTests {
-    @Test("日跨ぎなし: 範囲内")
-    func withinRangeNoOvernight() {
+final class QuietHoursTests: XCTestCase {
+    func testWithinRangeNoOvernight() {
         let range = QuietHourRange(start: "10:00", end: "18:00")
         let date = Calendar.current.date(from: DateComponents(hour: 14, minute: 0))!
-        #expect(QuietHours.isInRange(range, at: date))
+        XCTAssertTrue(QuietHours.isInRange(range, at: date))
     }
 
-    @Test("日跨ぎなし: 範囲外")
-    func outsideRangeNoOvernight() {
+    func testOutsideRangeNoOvernight() {
         let range = QuietHourRange(start: "10:00", end: "18:00")
         let date = Calendar.current.date(from: DateComponents(hour: 20, minute: 0))!
-        #expect(!QuietHours.isInRange(range, at: date))
+        XCTAssertFalse(QuietHours.isInRange(range, at: date))
     }
 
-    @Test("日跨ぎあり: 23:00-07:00 の深夜")
-    func overnightRangeMidnight() {
+    func testOvernightRangeMidnight() {
         let range = QuietHourRange(start: "23:00", end: "07:00")
         let date = Calendar.current.date(from: DateComponents(hour: 2, minute: 0))!
-        #expect(QuietHours.isInRange(range, at: date))
+        XCTAssertTrue(QuietHours.isInRange(range, at: date))
     }
 
-    @Test("日跨ぎあり: 23:00-07:00 の昼間")
-    func overnightRangeAfternoon() {
+    func testOvernightRangeAfternoon() {
         let range = QuietHourRange(start: "23:00", end: "07:00")
         let date = Calendar.current.date(from: DateComponents(hour: 12, minute: 0))!
-        #expect(!QuietHours.isInRange(range, at: date))
+        XCTAssertFalse(QuietHours.isInRange(range, at: date))
     }
 
-    @Test("境界値: ちょうど開始時刻")
-    func atStartBoundary() {
+    func testAtStartBoundary() {
         let range = QuietHourRange(start: "10:00", end: "18:00")
         let date = Calendar.current.date(from: DateComponents(hour: 10, minute: 0))!
-        #expect(QuietHours.isInRange(range, at: date))
+        XCTAssertTrue(QuietHours.isInRange(range, at: date))
     }
 
-    @Test("境界値: ちょうど終了時刻 (範囲外)")
-    func atEndBoundary() {
+    func testAtEndBoundary() {
         let range = QuietHourRange(start: "10:00", end: "18:00")
         let date = Calendar.current.date(from: DateComponents(hour: 18, minute: 0))!
-        #expect(!QuietHours.isInRange(range, at: date))
+        XCTAssertFalse(QuietHours.isInRange(range, at: date))
     }
 
-    @Test("start == end: 休止なし扱い")
-    func startEqualsEnd() {
+    func testStartEqualsEnd() {
         let range = QuietHourRange(start: "12:00", end: "12:00")
         let date = Calendar.current.date(from: DateComponents(hour: 12, minute: 0))!
-        #expect(!QuietHours.isInRange(range, at: date))
+        XCTAssertFalse(QuietHours.isInRange(range, at: date))
     }
 
-    @Test("isQuiet: 範囲0個")
-    func isQuietNoRanges() {
+    func testIsQuietNoRanges() {
         let date = Calendar.current.date(from: DateComponents(hour: 12, minute: 0))!
-        #expect(!QuietHours.isQuiet(ranges: [], at: date))
+        XCTAssertFalse(QuietHours.isQuiet(ranges: [], at: date))
     }
 
-    @Test("isQuiet: 複数範囲のOR判定")
-    func isQuietMultipleRanges() {
+    func testIsQuietMultipleRanges() {
         let ranges = [
             QuietHourRange(start: "00:00", end: "06:00"),
-            QuietHourRange(start: "22:00", end: "24:00"),
+            QuietHourRange(start: "22:00", end: "23:59"),
         ]
         let morning = Calendar.current.date(from: DateComponents(hour: 3, minute: 0))!
         let afternoon = Calendar.current.date(from: DateComponents(hour: 14, minute: 0))!
-        #expect(QuietHours.isQuiet(ranges: ranges, at: morning))
-        #expect(!QuietHours.isQuiet(ranges: ranges, at: afternoon))
+        XCTAssertTrue(QuietHours.isQuiet(ranges: ranges, at: morning))
+        XCTAssertFalse(QuietHours.isQuiet(ranges: ranges, at: afternoon))
     }
 }
 
-@Suite("ConfigStore Round-Trip Tests")
-struct ConfigStoreTests {
-    @Test("AppConfig.default の encode->decode round-trip")
-    func defaultConfigRoundTrip() throws {
+final class ConfigStoreTests: XCTestCase {
+    func testDefaultConfigRoundTrip() throws {
         let config = AppConfig.default
         let encoder = JSONEncoder()
         let data = try encoder.encode(config)
         let decoded = try JSONDecoder().decode(AppConfig.self, from: data)
-        #expect(decoded.checkIntervalSeconds == config.checkIntervalSeconds)
-        #expect(decoded.consecutiveFailuresBeforeNotify == config.consecutiveFailuresBeforeNotify)
-        #expect(decoded.quietHours.count == config.quietHours.count)
-        #expect(decoded.shares.count == config.shares.count)
+        XCTAssertEqual(decoded.checkIntervalSeconds, config.checkIntervalSeconds)
+        XCTAssertEqual(decoded.consecutiveFailuresBeforeNotify, config.consecutiveFailuresBeforeNotify)
+        XCTAssertEqual(decoded.quietHours.count, config.quietHours.count)
+        XCTAssertEqual(decoded.shares.count, config.shares.count)
     }
 
-    @Test("ShareConfig の UUID, Bool フィールドが保持されること")
-    func shareConfigFieldsPreserved() throws {
+    func testShareConfigFieldsPreserved() throws {
         let id = UUID()
         let share = ShareConfig(
             id: id,
@@ -100,54 +87,48 @@ struct ConfigStoreTests {
         let encoder = JSONEncoder()
         let data = try encoder.encode(share)
         let decoded = try JSONDecoder().decode(ShareConfig.self, from: data)
-        #expect(decoded.id == id)
-        #expect(decoded.enabled == false)
-        #expect(decoded.host == "192.168.1.10")
+        XCTAssertEqual(decoded.id, id)
+        XCTAssertFalse(decoded.enabled)
+        XCTAssertEqual(decoded.host, "192.168.1.10")
     }
 
-    @Test("QuietHourRange の境界値が保持されること")
-    func quietHourRangePreserved() throws {
+    func testQuietHourRangePreserved() throws {
         let range = QuietHourRange(start: "00:00", end: "23:59")
         let encoder = JSONEncoder()
         let data = try encoder.encode(range)
         let decoded = try JSONDecoder().decode(QuietHourRange.self, from: data)
-        #expect(decoded.start == "00:00")
-        #expect(decoded.end == "23:59")
+        XCTAssertEqual(decoded.start, "00:00")
+        XCTAssertEqual(decoded.end, "23:59")
     }
 }
 
-@Suite("MountManager URL Tests")
-struct MountManagerTests {
-    @Test("通常ケースの SMB URL 組み立て")
-    func normalSMBURL() {
+final class MountManagerTests: XCTestCase {
+    func testNormalSMBURL() {
         let url = MountManager.buildSMBURL(username: "user", host: "192.168.1.10", shareName: "share")
-        #expect(url != nil)
-        #expect(url?.scheme == "smb")
-        #expect(url?.host == "192.168.1.10")
-        #expect(url?.user == "user")
-        #expect(url?.path == "/share")
+        XCTAssertNotNil(url)
+        XCTAssertEqual(url?.scheme, "smb")
+        XCTAssertEqual(url?.host, "192.168.1.10")
+        XCTAssertEqual(url?.user, "user")
+        XCTAssertEqual(url?.path, "/share")
     }
 
-    @Test("ユーザー名に @ を含む: パーセントエンコード")
-    func usernameWithAtSign() {
+    func testUsernameWithAtSign() {
         let url = MountManager.buildSMBURL(username: "user@domain", host: "192.168.1.10", shareName: "share")
-        #expect(url != nil)
+        XCTAssertNotNil(url)
         let urlString = url?.absoluteString ?? ""
-        #expect(!urlString.contains("@@"))
+        XCTAssertFalse(urlString.contains("@@"))
     }
 
-    @Test("共有名にスペースを含む: %20")
-    func shareNameWithSpace() {
+    func testShareNameWithSpace() {
         let url = MountManager.buildSMBURL(username: "user", host: "192.168.1.10", shareName: "my share")
-        #expect(url != nil)
+        XCTAssertNotNil(url)
         let path = url?.path ?? ""
-        #expect(path.contains("my") && path.contains("share"))
+        XCTAssertTrue(path.contains("my") && path.contains("share"))
     }
 
-    @Test("空文字列: nil を返す")
-    func emptyStrings() {
-        #expect(MountManager.buildSMBURL(username: "", host: "192.168.1.10", shareName: "share") == nil)
-        #expect(MountManager.buildSMBURL(username: "user", host: "", shareName: "share") == nil)
-        #expect(MountManager.buildSMBURL(username: "user", host: "192.168.1.10", shareName: "") == nil)
+    func testEmptyStrings() {
+        XCTAssertNil(MountManager.buildSMBURL(username: "", host: "192.168.1.10", shareName: "share"))
+        XCTAssertNil(MountManager.buildSMBURL(username: "user", host: "", shareName: "share"))
+        XCTAssertNil(MountManager.buildSMBURL(username: "user", host: "192.168.1.10", shareName: ""))
     }
 }
