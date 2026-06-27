@@ -1,0 +1,47 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Compute version from tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Inject version into Info.plist
+        run: |
+          plutil -replace CFBundleShortVersionString -string "${{ steps.ver.outputs.version }}" Resources/Info.plist
+          plutil -p Resources/Info.plist | grep -E 'CFBundleShortVersionString|CFBundleVersion'
+
+      - name: Build .app bundle
+        run: ./scripts/make-app.sh
+
+      - name: Package .app into zip
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/Remora.app "Remora-${{ steps.ver.outputs.tag }}.zip"
+          ls -lah "Remora-${{ steps.ver.outputs.tag }}.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Remora ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          files: Remora-${{ steps.ver.outputs.tag }}.zip
