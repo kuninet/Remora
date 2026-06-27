@@ -29,4 +29,16 @@ done
 
 chmod +x "$APP_DIR/Contents/MacOS/Remora"
 
+# Ad-hoc sign so macOS Gatekeeper does not flag the bundle as
+# "damaged" after the ZIP is downloaded with a quarantine attribute.
+# This is not a Developer ID signature (no Apple developer account
+# required), but it gives the bundle a stable code identity that the
+# notarization-aware Gatekeeper checks accept far more reliably than
+# an entirely unsigned binary. Strip any old signature first to avoid
+# resource-fork residue from previous builds confusing codesign.
+xattr -cr "$APP_DIR" || true
+codesign --remove-signature "$APP_DIR" 2>/dev/null || true
+codesign --force --deep --sign - --timestamp=none "$APP_DIR"
+codesign --verify --verbose=2 "$APP_DIR"
+
 echo "Build complete: $APP_DIR"
