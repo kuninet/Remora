@@ -223,9 +223,18 @@ final class StatusItemController {
     }
 
     @objc private func showAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+        let credits = NSMutableAttributedString(string: "MIT License\n")
+        let urlString = "https://github.com/kuninet/Remora"
+        if let url = URL(string: urlString) {
+            credits.append(NSAttributedString(
+                string: urlString,
+                attributes: [.link: url]
+            ))
+        }
         NSApplication.shared.orderFrontStandardAboutPanel(options: [
             .applicationName: "Remora",
-            .credits: NSAttributedString(string: "MIT License\nhttps://github.com/kuninet/Remora"),
+            .credits: credits,
         ])
     }
 
