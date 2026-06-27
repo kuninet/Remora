@@ -13,6 +13,11 @@ let package = Package(
                 .linkedFramework("Security"),
                 .linkedFramework("ServiceManagement"),
             ]
+        ),
+        .testTarget(
+            name: "RemoraTests",
+            dependencies: ["Remora"],
+            path: "Tests/RemoraTests"
         )
     ]
 )
