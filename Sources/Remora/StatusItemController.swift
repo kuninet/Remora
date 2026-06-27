@@ -177,7 +177,11 @@ final class StatusItemController {
     @objc private func disconnect(_ sender: NSMenuItem) {
         guard let share = sender.representedObject as? ShareConfig else { return }
         Task {
-            try? await mountManager.unmount(share)
+            do {
+                try await mountManager.unmount(share)
+            } catch {
+                RLog(.error, category: "menu", "切断失敗 \(share.host)/\(share.shareName): \(error.localizedDescription)")
+            }
         }
     }
 
@@ -188,7 +192,11 @@ final class StatusItemController {
     @objc private func disconnectAll() {
         Task {
             for share in configStore.config.shares {
-                try? await mountManager.unmount(share)
+                do {
+                    try await mountManager.unmount(share)
+                } catch {
+                    RLog(.error, category: "menu", "切断失敗 \(share.host)/\(share.shareName): \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -211,7 +219,15 @@ final class StatusItemController {
     }
 
     @objc private func toggleLoginItem() {
-        try? loginItemManager.toggle()
+        do {
+            try loginItemManager.toggle()
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "ログイン項目の変更に失敗しました"
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .warning
+            alert.runModal()
+        }
         rebuildMenu(states: currentStates)
     }
 }

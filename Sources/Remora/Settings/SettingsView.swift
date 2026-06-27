@@ -21,6 +21,7 @@ struct SharesTabView: View {
     @State private var selectedID: UUID?
     @State private var showingAddSheet = false
     @State private var editingShare: ShareConfig?
+    @State private var errorMessage: String?
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -54,7 +55,11 @@ struct SharesTabView: View {
                 .disabled(selectedID == nil)
                 Button("削除") {
                     if let id = selectedID {
-                        try? configStore.removeShare(id: id)
+                        do {
+                            try configStore.removeShare(id: id)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
                         selectedID = nil
                     }
                 }
@@ -67,11 +72,19 @@ struct SharesTabView: View {
                 existingShare: editingShare,
                 onSave: { share, password in
                     let key = KeychainKey(host: share.host, shareName: share.shareName)
-                    try? KeychainStore.setPassword(password, for: key)
-                    if editingShare != nil {
-                        try? configStore.updateShare(share)
-                    } else {
-                        try? configStore.addShare(share)
+                    do {
+                        try KeychainStore.setPassword(password, for: key)
+                    } catch {
+                        errorMessage = "パスワードの保存に失敗しました: \(error.localizedDescription)"
+                    }
+                    do {
+                        if editingShare != nil {
+                            try configStore.updateShare(share)
+                        } else {
+                            try configStore.addShare(share)
+                        }
+                    } catch {
+                        errorMessage = "設定の保存に失敗しました: \(error.localizedDescription)"
                     }
                     editingShare = nil
                     showingAddSheet = false
@@ -81,6 +94,14 @@ struct SharesTabView: View {
                     showingAddSheet = false
                 }
             )
+        }
+        .alert("エラー", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 }
@@ -106,7 +127,7 @@ struct ShareEditSheet: View {
                 TextField("ホスト (例: 192.168.1.10)", text: $host)
                 TextField("共有名 (例: shared)", text: $shareName)
                     .onChange(of: shareName) { newValue in
-                        if mountPoint.isEmpty || mountPoint == "/Volumes/\(host)" {
+                        if mountPoint.isEmpty || mountPoint == "/Volumes/\(shareName)" {
                             mountPoint = "/Volumes/\(newValue)"
                         }
                     }
@@ -157,6 +178,7 @@ struct AdvancedTabView: View {
 
     @State private var newQuietStart: String = "23:00"
     @State private var newQuietEnd: String = "07:00"
+    @State private var errorMessage: String?
 
     var body: some View {
         Form {
@@ -168,7 +190,11 @@ struct AdvancedTabView: View {
                         set: { newVal in
                             var c = configStore.config
                             c.checkIntervalSeconds = max(30, min(600, newVal))
-                            try? configStore.update(c)
+                            do {
+                                try configStore.update(c)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
                         }
                     ),
                     step: 30
@@ -183,7 +209,11 @@ struct AdvancedTabView: View {
                         set: { newVal in
                             var c = configStore.config
                             c.consecutiveFailuresBeforeNotify = max(1, newVal)
-                            try? configStore.update(c)
+                            do {
+                                try configStore.update(c)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
                         }
                     ),
                     step: 1
@@ -196,7 +226,11 @@ struct AdvancedTabView: View {
                         Text("\(range.start) 〜 \(range.end)")
                         Spacer()
                         Button("削除") {
-                            try? configStore.removeQuietHour(at: index)
+                            do {
+                                try configStore.removeQuietHour(at: index)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
                         }
                         .foregroundColor(.red)
                     }
@@ -210,7 +244,11 @@ struct AdvancedTabView: View {
                         .frame(width: 80)
                     Button("追加") {
                         let range = QuietHourRange(start: newQuietStart, end: newQuietEnd)
-                        try? configStore.addQuietHour(range)
+                        do {
+                            try configStore.addQuietHour(range)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
                     }
                 }
             }
@@ -223,5 +261,13 @@ struct AdvancedTabView: View {
             }
         }
         .padding()
+        .alert("エラー", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
     }
 }

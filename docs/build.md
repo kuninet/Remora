@@ -8,7 +8,8 @@
 - Xcode Command Line Tools (約 1.5 GB) がインストール済み
   - 確認: `xcode-select -p` がパスを返す
   - 未インストールの場合: `xcode-select --install`
-- **Xcode 本体 (10 GB+) は不要です**
+- **`.app` のビルドだけなら Xcode 本体 (10 GB+) は不要です**
+- **`swift test` を実行したい場合は Xcode 本体が必要** (理由は下記「テストを実行する場合」参照)
 
 ## 確認
 
@@ -75,6 +76,21 @@ swift build
 
 `.app` バンドルを `/Applications` 以外で `open` する場合、Gatekeeper が拒否することがあります。詳細は [install.md](install.md#初回起動時の-gatekeeper-対応) を参照。
 
+## テストを実行する場合
+
+`swift test` は CLT のみでは動作しません。`XCTest.framework` が CLT には同梱されていないためです。
+
+ローカルでテストを動かしたい場合は、App Store から **Xcode** をインストールしてください。インストール後:
+
+```bash
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+swift test
+```
+
+`xcode-select` の切り替えで Xcode 同梱のツールチェインに向け直すと `XCTest.framework` が見えるようになります。
+
+Xcode を入れたくない場合は、CI に頼る運用で問題ありません。詳細は [test.md](test.md) を参照。
+
 ## CI でのビルド
 
-`.github/workflows/build.yml` が PR ごとに `swift build -c release` と `swift test` を実行し、緑/赤で結果を返します。手元でも同じ手順で動作を保証できます。
+`.github/workflows/build.yml` が PR ごとに `swift build -c release` と `swift test` を実行し、緑/赤で結果を返します。CI ランナー (`macos-latest`) には Xcode が同梱されているため、`swift test` も含めて完全に検証されます。
