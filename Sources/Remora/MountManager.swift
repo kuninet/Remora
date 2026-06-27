@@ -39,9 +39,6 @@ actor MountManager {
             throw RemoraError.mountFailed(-1)
         }
 
-        let mountPoint = share.mountPoint
-        try createMountPointIfNeeded(mountPoint)
-
         let password = try KeychainStore.password(for: KeychainKey(host: share.host, shareName: share.shareName))
 
         let capturedShare = share
@@ -57,12 +54,10 @@ actor MountManager {
                 openOptions[kNetFSPasswordKey as String] = pw
             }
 
-            let mountPointURL = URL(fileURLWithPath: mountPoint) as CFURL
-
             Task.detached(priority: .background) {
                 let result = NetFSMountURLSync(
                     url as CFURL,
-                    mountPointURL,
+                    nil,
                     capturedShare.username as CFString,
                     nil,
                     openOptions,
@@ -151,30 +146,22 @@ actor MountManager {
         NSWorkspace.shared.open(URL(fileURLWithPath: mountPoint))
     }
 
-    private func createMountPointIfNeeded(_ path: String) throws {
-        var isDir: ObjCBool = false
-        if FileManager.default.fileExists(atPath: path, isDirectory: &isDir) {
-            if isDir.boolValue { return }
-        }
-        do {
-            try FileManager.default.createDirectory(
-                atPath: path,
-                withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o755]
-            )
-        } catch {
-            throw RemoraError.mountFailed(OSStatus(errno))
-        }
-    }
-
     private nonisolated static func mapNetFSError(_ status: Int32, share: ShareConfig) -> RemoraError {
         switch status {
+        // NetFS framework errors
         case -6003:
             return .authFailed(share: share.shareName)
         case -6002:
             return .hostUnreachable(host: share.host)
         case -6004:
             return .shareNotFound(share: share.shareName)
+        // POSIX errno values surfaced by mount_smbfs / kernel
+        case EACCES, EPERM:
+            return .authFailed(share: share.shareName)
+        case ENOENT:
+            return .shareNotFound(share: share.shareName)
+        case EHOSTUNREACH, EHOSTDOWN, ENETUNREACH, ETIMEDOUT, ECONNREFUSED:
+            return .hostUnreachable(host: share.host)
         default:
             return .mountFailed(OSStatus(status))
         }
