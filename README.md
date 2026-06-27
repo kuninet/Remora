@@ -27,7 +27,8 @@ Remora は 1 分ごとに状態をチェックし、スリープ復帰やネッ�
 ## 必要環境
 
 - macOS 13 (Ventura) 以降
-- ビルドする場合: Xcode Command Line Tools (Xcode フル本体は不要)
+- `.app` をビルドする場合: Xcode Command Line Tools (Xcode フル本体は不要)
+- ローカルで `swift test` を走らせる場合のみ: Xcode 本体が必要 (`XCTest.framework` が CLT に同梱されないため)
 
 ## 使い方
 
