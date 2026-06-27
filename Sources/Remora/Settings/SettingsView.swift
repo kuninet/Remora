@@ -83,10 +83,9 @@ struct SharesTabView: View {
         .listStyle(.inset)
         .frame(minHeight: 220)
         .onTapGesture(count: 2) {
-            if selectedShare != nil {
-                editingShare = selectedShare
-                showingAddSheet = true
-            }
+            guard editingShare == nil, let share = selectedShare else { return }
+            editingShare = share
+            showingAddSheet = true
         }
     }
 
@@ -382,7 +381,13 @@ struct AdvancedTabView: View {
             Section {
                 Toggle("ログイン時に自動起動", isOn: Binding(
                     get: { loginItemManager.isEnabled },
-                    set: { _ in try? loginItemManager.toggle() }
+                    set: { _ in
+                        do {
+                            try loginItemManager.toggle()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
                 ))
             } header: {
                 Label("スタートアップ", systemImage: "power")
