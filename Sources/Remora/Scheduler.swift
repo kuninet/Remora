@@ -36,6 +36,12 @@ final class Scheduler {
                 self?.rescheduleTimer()
             }
             .store(in: &cancellables)
+
+        // Timer.scheduledTimer only fires after `withTimeInterval`, leaving an
+        // empty first checkIntervalSeconds window where nothing is mounted.
+        // Run a check immediately so the menu bar reflects reality from
+        // launch instead of after the first tick.
+        triggerNow()
     }
 
     func stop() {
