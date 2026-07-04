@@ -11,6 +11,7 @@ final class Scheduler {
     private let eventMonitor: EventMonitor
     private var timer: Timer?
     private var cancellables: Set<AnyCancellable> = []
+    private var checkInFlight = false
 
     init(configStore: ConfigStore, mountManager: MountManager, eventMonitor: EventMonitor) {
         self.configStore = configStore
@@ -52,7 +53,12 @@ final class Scheduler {
     }
 
     func triggerNow() {
-        Task { await runCheck() }
+        guard !checkInFlight else { return }
+        checkInFlight = true
+        Task { @MainActor [weak self] in
+            defer { self?.checkInFlight = false }
+            await self?.runCheck()
+        }
     }
 
     private func scheduleTimer() {
